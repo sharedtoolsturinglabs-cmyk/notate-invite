@@ -174,6 +174,22 @@
         </div>
       </div>
 
+      <!-- Extension handoff: shown for code links when the Notate extension
+           is present. The extension does the join under its OWN session, so
+           the page never authenticates (no second account, no mismatch). -->
+      <div id="ext-handoff" class="hidden">
+        <div class="section">
+          <h1>Opening Notate…</h1>
+          <p class="lead" id="ext-handoff-lead"><span class="spinner"></span>Joining in your Notate extension — you can close this tab.</p>
+        </div>
+        <div class="section">
+          <div class="btn-row">
+            <button id="ext-open-btn" class="btn primary hidden">Open Notate to finish joining</button>
+          </div>
+          <a href="#" id="ext-fallback-link" class="text-link hidden">Continue in this browser instead</a>
+        </div>
+      </div>
+
       <!-- Status line — RPC errors surface here. Lives outside the
            state divs so it stays visible across transitions. -->
       <div id="status" class="status" aria-live="polite" style="padding: 0 28px 16px;"></div>
@@ -213,7 +229,7 @@
     const mode = token ? "token" : (code ? "code" : null);
 
     const $ = (id) => document.getElementById(id);
-    const show = (id) => { for (const k of ["loading","not-found","expired","resolved","sign-in","confirm","done","rejected"]) $(k).classList.toggle("hidden", k !== id); };
+    const show = (id) => { for (const k of ["loading","not-found","expired","resolved","sign-in","confirm","done","rejected","ext-handoff"]) $(k).classList.toggle("hidden", k !== id); };
     const setStatus = (msg, kind) => { const el = $("status"); el.textContent = msg || ""; el.className = "status" + (kind ? " " + kind : ""); };
 
     if (!mode) { show("not-found"); throw new Error("missing token or code"); }
@@ -243,6 +259,62 @@
           }
         );
       } catch { /* extension not installed — fall back to manual */ }
+    }
+
+    // ─── Extension handoff (code links) ────────────────────────────────
+    // Hand the raw code to the Notate extension and let IT do the join under
+    // its own logged-in session. Resolves: "accepted" (extension took over),
+    // "absent" (no extension in this browser/profile -> page flow), or
+    // "ambiguous" (no reply in time, likely a cold service worker -> show an
+    // explicit Open-Notate action; never silently page-join, which would
+    // reintroduce the account-mismatch bug).
+    function attemptExtensionHandoff() {
+      return new Promise((resolve) => {
+        if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage || CFG.EXTENSION_ID.startsWith("REPLACE_")) {
+          resolve("absent"); return;
+        }
+        let settled = false;
+        const done = (v) => { if (!settled) { settled = true; resolve(v); } };
+        const timer = setTimeout(() => done("ambiguous"), 2000);
+        try {
+          chrome.runtime.sendMessage(
+            CFG.EXTENSION_ID,
+            { type: "NOTATE_JOIN_BY_CODE_EXTERNAL", code },
+            (resp) => {
+              clearTimeout(timer);
+              if (chrome.runtime.lastError) { done("absent"); return; }
+              done(resp && resp.ok && resp.accepted ? "accepted" : "absent");
+            }
+          );
+        } catch { clearTimeout(timer); done("absent"); }
+      });
+    }
+
+    function showHandoff(kind) {
+      show("ext-handoff");
+      setStatus("");
+      const lead = $("ext-handoff-lead");
+      const openBtn = $("ext-open-btn");
+      const fallback = $("ext-fallback-link");
+      if (kind === "accepted") {
+        lead.innerHTML = '<span class="spinner"></span>Joining in your Notate extension — you can close this tab.';
+        openBtn.classList.add("hidden");
+        fallback.classList.add("hidden");
+        return;
+      }
+      // ambiguous — service worker may be cold; offer an explicit retry plus a
+      // deliberate opt-in to the in-browser flow.
+      lead.textContent = "Almost there — open Notate to finish joining.";
+      openBtn.classList.remove("hidden");
+      fallback.classList.remove("hidden");
+      openBtn.onclick = async () => {
+        openBtn.disabled = true;
+        const o = await attemptExtensionHandoff();
+        openBtn.disabled = false;
+        if (o === "accepted") showHandoff("accepted");
+        else if (o === "absent") runPageFlow();
+      };
+      fallback.onclick = (e) => { e.preventDefault(); runPageFlow(); };
     }
 
     // ─── Preview the invite ────────────────────────────────────────────
@@ -336,6 +408,24 @@
         }
       } catch { /* flags unavailable — continue and let the token decide */ }
 
+      // Code links: hand the code to the Notate extension first. If it takes
+      // over, the extension joins under its OWN logged-in session — no page
+      // auth, no confirm, no second account, so the account-mismatch bug can't
+      // happen. Only a genuinely absent extension falls through to the
+      // in-browser flow below. The ?token= (per-email) path is unchanged.
+      if (mode === "code") {
+        const outcome = await attemptExtensionHandoff();
+        if (outcome === "accepted") { showHandoff("accepted"); return; }
+        if (outcome === "ambiguous") { showHandoff("ambiguous"); return; }
+        // "absent" -> fall through to the in-browser flow.
+      }
+      await runPageFlow();
+    })();
+
+    // ─── In-browser fallback flow (no extension, or user opted in) ──────
+    // Unchanged from the original behaviour — the only path for recipients
+    // without the extension. Joins as the account signed in ON THIS PAGE.
+    async function runPageFlow() {
       // Resolve the session FIRST. supabase-js parses the OAuth hash on
       // init; calling the auth-gated preview RPC before the session is
       // established (e.g. right after the Google redirect) would return
@@ -459,7 +549,7 @@
         await supabase.auth.signOut();
         window.location.reload();
       });
-    })();
+    }
   </script>
 </body>
 </html>
