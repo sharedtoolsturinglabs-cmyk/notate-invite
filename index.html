@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Accept your Notate invitation</title>
+  <link rel="icon" href="data:," />
+  <style>
+    /* Palette intentionally minimal — black ink + neutral grays. Do
+       NOT add brand accents (purple/blue) here; that drift was
+       explicitly called out. */
+    :root {
+      --bg: #f5f5f5;
+      --card: #ffffff;
+      --ink: #0f0f0f;
+      --muted: #6b6b6b;
+      --line: #ececec;
+      --accent: #0f0f0f;
+      --accent-ink: #ffffff;
+      --danger: #c0382b;
+      --ok: #16834b;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    .wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 16px; }
+    /* Card mirrors the "Weekly Standup" reference — rounded, hairline
+       border, very soft shadow, sections separated by 1px lines. No
+       coloured header bar. */
+    .card { width: 100%; max-width: 480px; background: var(--card); border-radius: var(--radius); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(15,15,15,0.05); overflow: hidden; }
+    .section { padding: 24px 28px; }
+    .section + .section { border-top: 1px solid var(--line); }
+    h1 { margin: 0 0 10px; font-size: 26px; font-weight: 700; letter-spacing: -0.6px; line-height: 1.2; }
+    .lead { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    /* "Signed in as: <email>" — label/value pair tucked into the
+       middle section so the heading stays uncluttered. */
+    .detail { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; font-size: 14px; color: var(--ink); }
+    .detail .label { color: var(--muted); }
+    .detail .value { font-weight: 600; }
+    .mismatch { margin: 12px 0 0; padding: 10px 12px; background: rgba(192,56,43,0.08); border-radius: 8px; color: var(--danger); font-size: 13px; line-height: 1.45; }
+    /* Buttons fill the section width and stack — mirrors the
+       full-width "Join meeting" CTA in the reference. */
+    .btn-row { display: flex; flex-direction: column; gap: 10px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 48px; padding: 0 20px; border-radius: 12px; border: 1px solid transparent; font-weight: 600; font-size: 15px; cursor: pointer; transition: opacity .15s, transform .05s, background-color .15s, border-color .15s; }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn:active:not(:disabled) { transform: translateY(1px); }
+    .btn.primary { background: var(--accent); color: var(--accent-ink); }
+    .btn.primary:hover:not(:disabled) { background: #1f1f1f; }
+    .btn.secondary { background: transparent; color: var(--ink); border-color: var(--line); }
+    .btn.secondary:hover:not(:disabled) { background: #f5f5f5; }
+    /* Decline reads as the destructive minor action — text-only, no
+       border, smaller. Keeps the primary CTA dominant. */
+    .btn.danger-ghost { background: transparent; color: var(--danger); border-color: transparent; height: 42px; font-size: 13px; font-weight: 500; }
+    .btn.danger-ghost:hover:not(:disabled) { background: rgba(192,56,43,0.06); }
+    .text-link { display: inline-block; margin-top: 14px; color: var(--muted); font-size: 12px; text-decoration: underline; cursor: pointer; }
+    .text-link:hover { color: var(--ink); }
+    .status { margin: 12px 0 0; font-size: 13px; color: var(--muted); min-height: 18px; }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--danger); }
+    .hidden { display: none !important; }
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #ddd; border-top-color: var(--ink); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .footer { padding: 14px 28px; background: #fafafa; border-top: 1px solid var(--line); text-align: center; font-size: 11px; color: #9a9a9a; letter-spacing: 0.02em; }
+    a { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <!--
+    Each state below renders as its own card body — the script swaps
+    visibility on the wrapper divs by ID. Every element ID present in
+    the old structure is preserved (ws-name-1/2/3, inviter-1/2,
+    invite-email-1/2, signed-in-as, mismatch, done-ws, handoff-note,
+    accept-btn, reject-btn, reject-out-btn, sign-in-btn, open-ext-btn,
+    signout-link, status, resolved-title, resolved-body) so the
+    existing module script keeps working unchanged.
+  -->
+  <div class="wrap">
+    <main class="card" role="main">
+
+      <!-- Loading / not-found / expired / resolved / rejected:
+           single-section informational states, no CTA. -->
+      <div id="loading">
+        <div class="section">
+          <h1>Checking your invitation…</h1>
+          <p class="lead"><span class="spinner"></span>One moment.</p>
+        </div>
+      </div>
+
+      <div id="not-found" class="hidden">
+        <div class="section">
+          <h1>Invitation not found</h1>
+          <p class="lead">The link is invalid or has been removed. Ask whoever invited you to send a fresh one.</p>
+        </div>
+      </div>
+
+      <div id="expired" class="hidden">
+        <div class="section">
+          <h1>Invitation expired</h1>
+          <p class="lead">Invitation links are valid for 14 days. Ask the workspace owner to resend it.</p>
+        </div>
+      </div>
+
+      <div id="resolved" class="hidden">
+        <div class="section">
+          <h1 id="resolved-title">Invitation already resolved</h1>
+          <p class="lead" id="resolved-body">You've already responded to this invitation.</p>
+        </div>
+      </div>
+
+      <div id="rejected" class="hidden">
+        <div class="section">
+          <h1>Invitation declined</h1>
+          <p class="lead">No problem — you won't see this workspace.</p>
+        </div>
+      </div>
+
+      <!-- Sign-in: heading + lead in the top section, primary CTA +
+           Decline stacked in the bottom section. Decline is hidden
+           by the script when in code-mode (no recipient to reject). -->
+      <div id="sign-in" class="hidden">
+        <div class="section">
+          <h1>Join <span id="ws-name-1">workspace</span></h1>
+          <p class="lead"><strong id="inviter-1">Someone</strong> wants to share <strong id="ws-name-2">a workspace</strong> on Notate. Sign in with <strong id="invite-email-1"></strong> to accept.</p>
+        </div>
+        <div class="section">
+          <div class="btn-row">
+            <button id="sign-in-btn" class="btn primary">Continue with Google</button>
+            <button id="reject-out-btn" class="btn danger-ghost">Decline invitation</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Confirm: heading + lead, then the "Signed in as" detail row
+           and the mismatch warning, then the primary CTA. -->
+      <div id="confirm" class="hidden">
+        <div class="section">
+          <h1>Join <span id="ws-name-3">workspace</span></h1>
+          <p class="lead"><strong id="inviter-2">Someone</strong> invited <strong id="invite-email-2"></strong> to collaborate on Notate.</p>
+        </div>
+        <div class="section">
+          <div class="detail">
+            <span class="label">Signed in as</span>
+            <span class="value" id="signed-in-as">—</span>
+          </div>
+          <p id="mismatch" class="mismatch hidden">
+            You're signed in with a different email than this invite was sent to. Switch accounts to accept.
+          </p>
+        </div>
+        <div class="section">
+          <div class="btn-row">
+            <button id="accept-btn" class="btn primary">Accept invitation</button>
+            <button id="reject-btn" class="btn danger-ghost">Decline invitation</button>
+          </div>
+          <a href="#" id="signout-link" class="text-link">Sign in with a different account</a>
+        </div>
+      </div>
+
+      <!-- Done: success heading + handoff note. CTA re-opens the
+           sidepanel ping in case auto-switch missed. -->
+      <div id="done" class="hidden">
+        <div class="section">
+          <h1>You're in 🎉</h1>
+          <p class="lead">You've joined <strong id="done-ws">the workspace</strong>. Open the Notate side panel — it should switch automatically.</p>
+        </div>
+        <div class="section">
+          <div class="btn-row">
+            <button id="open-ext-btn" class="btn primary">Open Notate</button>
+          </div>
+          <p class="status" id="handoff-note">
+            If Notate doesn't switch automatically, click the extension icon to refresh.
+          </p>
+        </div>
+      </div>
+
+      <!-- Status line — RPC errors surface here. Lives outside the
+           state divs so it stays visible across transitions. -->
+      <div id="status" class="status" aria-live="polite" style="padding: 0 28px 16px;"></div>
+
+      <div class="footer">Notate · Visual feedback for the web</div>
+    </main>
+  </div>
+
+  <!--
+    ─────────────────────────────────────────────────────────────────────
+    Deployment config — EDIT THESE before deploying.
+    All three values are PUBLIC (the anon key is safe in client JS;
+    the Chrome extension ID is just an identifier).
+    ─────────────────────────────────────────────────────────────────────
+  -->
+  <script>
+    window.NOTATE_CONFIG = {
+      SUPABASE_URL: "https://gwqxaxtawjxcesamesyx.supabase.co",
+      SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3cXhheHRhd2p4Y2VzYW1lc3l4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNjE0MjMsImV4cCI6MjA5NTYzNzQyM30.4BP_c8PVCDGYuB5pYHD_3ZAN7tukJzFNCOqUde0t048",
+      // Your published extension ID once on the Chrome Web Store; or the
+      // unpacked ID printed at chrome://extensions while developing.
+      EXTENSION_ID: "lkchngfllpimdgiodppfjmidfmigpmna",
+    };
+  </script>
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
+
+    const CFG = window.NOTATE_CONFIG;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    // `?code=ABC123` is the workspace-level join code surfaced as a
+    // shareable URL from Settings → Invite Others. It does NOT bind to
+    // a specific recipient email — anyone with the link can join,
+    // matching the in-extension paste-the-code flow. The `?token=...`
+    // branch above stays for per-email invites sent via Resend.
+    const code = (params.get("code") || "").trim().toUpperCase();
+    const mode = token ? "token" : (code ? "code" : null);
+
+    const $ = (id) => document.getElementById(id);
+    const show = (id) => { for (const k of ["loading","not-found","expired","resolved","sign-in","confirm","done","rejected"]) $(k).classList.toggle("hidden", k !== id); };
+    const setStatus = (msg, kind) => { const el = $("status"); el.textContent = msg || ""; el.className = "status" + (kind ? " " + kind : ""); };
+
+    if (!mode) { show("not-found"); throw new Error("missing token or code"); }
+    if (CFG.SUPABASE_URL.startsWith("REPLACE_")) {
+      show("not-found");
+      setStatus("This page hasn't been configured yet. Edit NOTATE_CONFIG in accept-invite/index.html.", "err");
+      throw new Error("unconfigured");
+    }
+
+    const supabase = createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, {
+      auth: { persistSession: true, detectSessionInUrl: true, autoRefreshToken: true },
+    });
+
+    // ─── Notify the extension after a successful accept ────────────────
+    function notifyExtension(workspaceId, workspaceName) {
+      try {
+        if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage) return;
+        chrome.runtime.sendMessage(
+          CFG.EXTENSION_ID,
+          { type: "INVITE_ACCEPTED_EXTERNAL", workspaceId, workspaceName },
+          () => {
+            const err = chrome.runtime.lastError;
+            if (err) {
+              const note = $("handoff-note");
+              if (note) note.textContent = "Couldn't reach the Notate extension. Open it manually from the toolbar.";
+            }
+          }
+        );
+      } catch { /* extension not installed — fall back to manual */ }
+    }
+
+    // ─── Preview the invite ────────────────────────────────────────────
+    async function loadPreview() {
+      if (mode === "code") {
+        const { data, error } = await supabase.rpc("get_workspace_preview_by_code", { p_code: code });
+        // The preview RPC guards on auth.uid() — a logged-out visitor
+        // gets "auth required" here. Return null and let boot() show the
+        // sign-in screen first, then re-preview once a session exists.
+        // boot() uses the session state to tell "needs sign-in" apart
+        // from "genuinely invalid code".
+        if (error) { return null; }
+        const row = Array.isArray(data) ? data[0] : data;
+        if (!row) { return null; }
+        // Code-based join has no expiry, no per-recipient binding, and
+        // no resolved/revoked status — anyone with the code can join
+        // as long as the workspace still exists. Synthesize the same
+        // shape the token branch returns so downstream code stays
+        // uniform; the boot() logic skips status/expiry checks when
+        // `mode === "code"`.
+        return {
+          workspaceId: row.workspace_id,
+          workspaceName: row.workspace_name,
+          ownerEmail: row.owner_email,
+          inviterName: row.owner_email,
+          inviteEmail: "",
+          memberCount: row.member_count ?? 0,
+          status: "pending",
+          expiresAt: null,
+        };
+      }
+      const { data, error } = await supabase.rpc("get_invite_preview_by_token", { p_token: token });
+      if (error) { return null; }
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) { return null; }
+      return {
+        workspaceId: row.workspace_id,
+        workspaceName: row.workspace_name,
+        ownerEmail: row.owner_email,
+        inviterName: row.inviter_name,
+        inviteEmail: row.invite_email,
+        status: row.status,
+        expiresAt: new Date(row.expires_at),
+      };
+    }
+
+    function paintPreview(p) {
+      $("ws-name-1").textContent = p.workspaceName;
+      $("ws-name-2").textContent = p.workspaceName;
+      $("ws-name-3").textContent = p.workspaceName;
+      $("inviter-1").textContent = p.inviterName || p.ownerEmail;
+      $("inviter-2").textContent = p.inviterName || p.ownerEmail;
+      if (mode === "code") {
+        // Code-share UX: there is no "invited <email>" string. Rewrite
+        // the sign-in / confirm copy to be email-agnostic so the page
+        // doesn't render "Sign in with  to accept" with an empty span.
+        const m = p.memberCount === 1 ? "1 member" : (p.memberCount + " members");
+        $("sign-in").querySelector("p").innerHTML =
+          "Sign in with Google to join <strong>" + p.workspaceName + "</strong> (" + m + " · owner " + p.ownerEmail + ").";
+        $("confirm").querySelector("p").innerHTML =
+          "Join <strong>" + p.workspaceName + "</strong>? You'll be added as a member of this workspace.";
+      } else {
+        $("invite-email-1").textContent = p.inviteEmail;
+        $("invite-email-2").textContent = p.inviteEmail;
+      }
+    }
+
+    function paintResolved(p) {
+      const labels = {
+        accepted: ["You've already accepted this invitation", "You're already a member of " + p.workspaceName + "."],
+        rejected: ["You declined this invitation", "If that was a mistake, ask the owner to resend."],
+        revoked:  ["This invitation was revoked", "The workspace owner cancelled this invite."],
+        expired:  ["This invitation has expired", "Invitation links are valid for 14 days."],
+      };
+      const [t, b] = labels[p.status] || ["Invitation already resolved", "You've already responded to this invitation."];
+      $("resolved-title").textContent = t;
+      $("resolved-body").textContent = b;
+    }
+
+    // ─── Boot ──────────────────────────────────────────────────────────
+    (async function boot() {
+      // Backend kill-switch: if the invite/sharing feature is turned off,
+      // don't resolve invitations at all. Fail closed only on an explicit
+      // `false` — a fetch error shouldn't strand someone with a valid link.
+      try {
+        const { data: flags } = await supabase.rpc("notate_feature_flags");
+        if (flags && flags.invite_others === false) {
+          setStatus("Workspace invites are currently disabled.", "err");
+          show("not-found");
+          return;
+        }
+      } catch { /* flags unavailable — continue and let the token decide */ }
+
+      // Resolve the session FIRST. supabase-js parses the OAuth hash on
+      // init; calling the auth-gated preview RPC before the session is
+      // established (e.g. right after the Google redirect) would return
+      // "auth required" spuriously. getSession() awaits that init.
+      const { data: { session } } = await supabase.auth.getSession();
+
+      // ── Not signed in ───────────────────────────────────────────────
+      if (!session) {
+        // Token previews work unauthenticated, so we can show the real
+        // workspace name and catch already-resolved / expired invites
+        // before sign-in. Code previews are auth-gated (the RPC guards on
+        // auth.uid()), so this is null for code links while logged out —
+        // fall back to generic copy and reveal the name after sign-in.
+        const pre = await loadPreview();
+        if (mode === "token") {
+          if (!pre) { show("not-found"); return; }
+          paintPreview(pre);
+          if (pre.status !== "pending") {
+            paintResolved(pre);
+            show(pre.status === "expired" ? "expired" : "resolved");
+            return;
+          }
+          if (pre.expiresAt && pre.expiresAt < new Date()) { show("expired"); return; }
+        } else {
+          // Code link: no recipient to reject, so hide Decline. Show the
+          // real name if we happen to have it, else generic copy.
+          if (pre) paintPreview(pre);
+          else $("sign-in").querySelector("p").textContent =
+            "Sign in with Google to join this workspace on Notate.";
+          const rejectOut = $("reject-out-btn"); if (rejectOut) rejectOut.classList.add("hidden");
+        }
+
+        show("sign-in");
+        $("sign-in-btn").addEventListener("click", async () => {
+          setStatus("Redirecting…");
+          const { error } = await supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: { redirectTo: window.location.href },
+          });
+          if (error) setStatus(error.message, "err");
+        });
+        if (mode === "token") {
+          $("reject-out-btn").addEventListener("click", async () => {
+            $("reject-out-btn").disabled = true;
+            const { error } = await supabase.rpc("reject_workspace_invite_by_token", { p_token: token });
+            if (error) setStatus(error.message, "err");
+            else show("rejected");
+          });
+        }
+        return;
+      }
+
+      // ── Signed in — re-preview now that auth.uid() is populated ──────
+      const preview = await loadPreview();
+      if (!preview) { show("not-found"); return; }
+      paintPreview(preview);
+
+      // Status / expiry only apply to email-bound token invites. A code
+      // link is always "pending" — the workspace exists or it doesn't.
+      if (mode === "token") {
+        if (preview.status !== "pending") {
+          paintResolved(preview);
+          show(preview.status === "expired" ? "expired" : "resolved");
+          return;
+        }
+        if (preview.expiresAt && preview.expiresAt < new Date()) { show("expired"); return; }
+      } else {
+        const reject = $("reject-btn"); if (reject) reject.classList.add("hidden");
+      }
+
+      // Signed in — show confirm
+      show("confirm");
+      const userEmail = (session.user.email || "").toLowerCase();
+      $("signed-in-as").textContent = session.user.email || "(unknown)";
+      // Email-match enforcement only matters for token invites (they're
+      // bound to a specific recipient). Code-share links don't care
+      // which email signs in, so skip the mismatch gate entirely.
+      const mismatch = mode === "token" && userEmail !== preview.inviteEmail.toLowerCase();
+      $("mismatch").classList.toggle("hidden", !mismatch);
+      $("accept-btn").disabled = mismatch;
+      // Make the CTA label match the action — "Accept invitation"
+      // reads weird when there's no per-recipient invitation, just a
+      // shared code.
+      if (mode === "code") $("accept-btn").textContent = "Join workspace";
+
+      $("accept-btn").addEventListener("click", async () => {
+        $("accept-btn").disabled = true;
+        const rejectBtn = $("reject-btn"); if (rejectBtn) rejectBtn.disabled = true;
+        setStatus("Joining " + preview.workspaceName + "…");
+        const rpcName = mode === "code" ? "join_workspace_by_code" : "accept_workspace_invite_by_token";
+        const rpcArgs = mode === "code" ? { p_code: code } : { p_token: token };
+        const { data, error } = await supabase.rpc(rpcName, rpcArgs);
+        if (error) {
+          setStatus(error.message, "err");
+          $("accept-btn").disabled = false;
+          if (rejectBtn) rejectBtn.disabled = false;
+          return;
+        }
+        const row = Array.isArray(data) ? data[0] : data;
+        const wsName = row?.workspace_name || preview.workspaceName;
+        const wsId = row?.workspace_id || preview.workspaceId;
+        $("done-ws").textContent = wsName;
+        show("done");
+        setStatus("");
+        notifyExtension(wsId, wsName);
+        $("open-ext-btn").addEventListener("click", () => notifyExtension(wsId, wsName));
+      });
+
+      if (mode === "token") {
+        $("reject-btn").addEventListener("click", async () => {
+          $("accept-btn").disabled = true;
+          $("reject-btn").disabled = true;
+          const { error } = await supabase.rpc("reject_workspace_invite_by_token", { p_token: token });
+          if (error) { setStatus(error.message, "err"); return; }
+          show("rejected");
+        });
+      }
+
+      $("signout-link").addEventListener("click", async (e) => {
+        e.preventDefault();
+        await supabase.auth.signOut();
+        window.location.reload();
+      });
+    })();
+  </script>
+</body>
+</html>
