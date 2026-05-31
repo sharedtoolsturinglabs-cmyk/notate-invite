@@ -179,14 +179,32 @@
            the page never authenticates (no second account, no mismatch). -->
       <div id="ext-handoff" class="hidden">
         <div class="section">
-          <h1>Opening Notate…</h1>
-          <p class="lead" id="ext-handoff-lead"><span class="spinner"></span>Joining in your Notate extension — you can close this tab.</p>
+          <h1 id="ext-handoff-title">Opening Notate…</h1>
+          <p class="lead" id="ext-handoff-lead"><span class="spinner"></span>Joining you to the workspace.</p>
         </div>
         <div class="section">
           <div class="btn-row">
             <button id="ext-open-btn" class="btn primary hidden">Open Notate to finish joining</button>
+            <button id="ext-close-btn" class="btn primary hidden">Close this tab</button>
           </div>
           <a href="#" id="ext-fallback-link" class="text-link hidden">Continue in this browser instead</a>
+        </div>
+      </div>
+
+      <!-- No-extension state: the public link was opened in a browser without
+           the Notate extension. Primary CTA installs it; the secondary link
+           drops into the in-page sign-in flow as a fallback for non-Chrome
+           browsers (and anyone who'd rather not install). -->
+      <div id="no-extension" class="hidden">
+        <div class="section">
+          <h1>Notate isn't installed here</h1>
+          <p class="lead">This link opens your invite directly inside the Notate Chrome extension. Install it once and re-open the link — or accept in this browser without it.</p>
+        </div>
+        <div class="section">
+          <div class="btn-row">
+            <a id="install-ext-btn" class="btn primary" target="_blank" rel="noopener">Install Notate</a>
+            <button id="no-ext-fallback-btn" class="btn secondary">Continue in this browser</button>
+          </div>
         </div>
       </div>
 
@@ -227,9 +245,20 @@
     // branch above stays for per-email invites sent via Resend.
     const code = (params.get("code") || "").trim().toUpperCase();
     const mode = token ? "token" : (code ? "code" : null);
+    // Owner's page URL embedded when generating the invite link — used to
+    // navigate here after joining so the user lands on the real site with
+    // the extension already open, not on this landing page.
+    const refUrl = (() => {
+      try {
+        const r = params.get("ref");
+        if (!r) return null;
+        const u = new URL(r);
+        return (u.protocol === "https:" || u.protocol === "http:") ? u.href : null;
+      } catch { return null; }
+    })();
 
     const $ = (id) => document.getElementById(id);
-    const show = (id) => { for (const k of ["loading","not-found","expired","resolved","sign-in","confirm","done","rejected","ext-handoff"]) $(k).classList.toggle("hidden", k !== id); };
+    const show = (id) => { for (const k of ["loading","not-found","expired","resolved","sign-in","confirm","done","rejected","ext-handoff","no-extension"]) $(k).classList.toggle("hidden", k !== id); };
     const setStatus = (msg, kind) => { const el = $("status"); el.textContent = msg || ""; el.className = "status" + (kind ? " " + kind : ""); };
 
     if (!mode) { show("not-found"); throw new Error("missing token or code"); }
@@ -293,17 +322,35 @@
     function showHandoff(kind) {
       show("ext-handoff");
       setStatus("");
+      const title = $("ext-handoff-title");
       const lead = $("ext-handoff-lead");
       const openBtn = $("ext-open-btn");
+      const closeBtn = $("ext-close-btn");
       const fallback = $("ext-fallback-link");
+      openBtn.classList.add("hidden");
+      closeBtn.classList.add("hidden");
+      fallback.classList.add("hidden");
       if (kind === "accepted") {
-        lead.innerHTML = '<span class="spinner"></span>Joining in your Notate extension — you can close this tab.';
-        openBtn.classList.add("hidden");
-        fallback.classList.add("hidden");
+        title.textContent = "Opening Notate…";
+        lead.innerHTML = '<span class="spinner"></span>Joining you to the workspace.';
+        setTimeout(() => {
+          // If the owner embedded their page URL in the link, navigate there
+          // so the user lands on the real site with the extension already open.
+          if (refUrl) {
+            window.location.href = refUrl;
+            return;
+          }
+          // Fallback: no ref URL — show the success card as before.
+          title.textContent = "You're in 🎉";
+          lead.innerHTML = "You can close this tab now.";
+          closeBtn.classList.remove("hidden");
+          closeBtn.onclick = () => { try { window.close(); } catch {} };
+        }, 800);
         return;
       }
       // ambiguous — service worker may be cold; offer an explicit retry plus a
       // deliberate opt-in to the in-browser flow.
+      title.textContent = "Opening Notate…";
       lead.textContent = "Almost there — open Notate to finish joining.";
       openBtn.classList.remove("hidden");
       fallback.classList.remove("hidden");
@@ -312,9 +359,26 @@
         const o = await attemptExtensionHandoff();
         openBtn.disabled = false;
         if (o === "accepted") showHandoff("accepted");
-        else if (o === "absent") runPageFlow();
+        else if (o === "absent") showNoExtension();
       };
       fallback.onclick = (e) => { e.preventDefault(); runPageFlow(); };
+    }
+
+    // Show an explicit "no extension here" state instead of silently dropping
+    // into the in-page sign-in flow. The install link points at the Chrome
+    // Web Store listing for the configured extension id; the fallback button
+    // preserves the in-browser sign-in path for non-Chrome browsers (and
+    // anyone who'd rather not install).
+    function showNoExtension() {
+      show("no-extension");
+      setStatus("");
+      const installBtn = $("install-ext-btn");
+      const fallbackBtn = $("no-ext-fallback-btn");
+      const id = CFG.EXTENSION_ID;
+      installBtn.href = (id && !id.startsWith("REPLACE_"))
+        ? ("https://chromewebstore.google.com/detail/" + id)
+        : "https://chromewebstore.google.com/";
+      fallbackBtn.onclick = () => { runPageFlow(); };
     }
 
     // ─── Preview the invite ────────────────────────────────────────────
@@ -417,7 +481,12 @@
         const outcome = await attemptExtensionHandoff();
         if (outcome === "accepted") { showHandoff("accepted"); return; }
         if (outcome === "ambiguous") { showHandoff("ambiguous"); return; }
-        // "absent" -> fall through to the in-browser flow.
+        // "absent" -> explicit "Notate isn't installed" card with an Install
+        // CTA + a Continue-in-browser fallback. Silently dropping into the
+        // in-page sign-in was confusing — users had no signal that the
+        // extension hadn't picked up the link.
+        showNoExtension();
+        return;
       }
       await runPageFlow();
     })();
