@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>You removed Notate</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #fafafa;
+      color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 60px 24px 80px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 12px;
+      padding: 40px 44px;
+      max-width: 520px;
+      width: 100%;
+    }
+
+    .logo {
+      width: 32px;
+      height: 32px;
+      background: #1a1a1a;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo svg { display: block; }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1.3;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #666;
+      line-height: 1.5;
+      margin-bottom: 28px;
+    }
+
+    fieldset {
+      border: none;
+      padding: 0;
+      margin: 0 0 24px;
+    }
+
+    legend {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 14px;
+      color: #1a1a1a;
+    }
+
+    .option {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.1s;
+      margin-bottom: 2px;
+    }
+
+    .option:hover { background: #f5f5f5; }
+
+    .option input[type="radio"] {
+      margin-top: 1px;
+      accent-color: #1a1a1a;
+      flex-shrink: 0;
+    }
+
+    .option label {
+      font-size: 14px;
+      line-height: 1.4;
+      cursor: pointer;
+      color: #1a1a1a;
+    }
+
+    .reinstall-hint {
+      display: none;
+      margin-top: 6px;
+      padding: 8px 10px;
+      background: #f0fdf4;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #166534;
+    }
+
+    .reinstall-hint a {
+      color: #166534;
+      font-weight: 500;
+    }
+
+    textarea {
+      width: 100%;
+      border: 1px solid #e5e5e5;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 80px;
+      color: #1a1a1a;
+      margin-bottom: 16px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    textarea:focus { border-color: #999; }
+    textarea::placeholder { color: #aaa; }
+
+    .detail-label {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .contact-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .contact-row input[type="checkbox"] { accent-color: #1a1a1a; }
+
+    .contact-row label {
+      font-size: 13px;
+      color: #666;
+      cursor: pointer;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    button[type="submit"] {
+      background: #1a1a1a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    button[type="submit"]:hover { background: #333; }
+    button[type="submit"]:disabled { opacity: 0.5; cursor: default; }
+
+    .skip-link {
+      font-size: 13px;
+      color: #999;
+      text-decoration: none;
+    }
+
+    .skip-link:hover { color: #666; }
+
+    .success {
+      display: none;
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .success h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .success p {
+      font-size: 14px;
+      color: #666;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .success a {
+      display: inline-block;
+      background: #1a1a1a;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .error-msg {
+      display: none;
+      font-size: 13px;
+      color: #b91c1c;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <circle cx="9" cy="9" r="4" fill="white"/>
+        <path d="M9 2v2M9 14v2M2 9h2M14 9h2" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <div id="form-section">
+      <h1>You removed Notate — thank you for giving it a try.</h1>
+      <p class="subtitle">We're sorry to see you go. A quick answer helps us make Notate better for everyone. Your feedback is appreciated.</p>
+
+      <form id="feedback-form" novalidate>
+        <fieldset>
+          <legend>What made you decide to remove Notate?</legend>
+
+          <div class="option">
+            <input type="radio" name="reason" id="r1" value="no_longer_needed" />
+            <label for="r1">No longer needed / project finished</label>
+          </div>
+          <div class="option">
+            <input type="radio" name="reason" id="r2" value="missing_feature" />
+            <label for="r2">Missing a feature or integration I need</label>
+          </div>
+          <div class="option">
+            <input type="radio" name="reason" id="r3" value="found_better_tool" />
+            <label for="r3">Found a better tool</label>
+          </div>
+          <div class="option">
+            <input type="radio" name="reason" id="r4" value="technical_issues" />
+            <label for="r4">Technical issues or bugs</label>
+          </div>
+          <div class="option">
+            <input type="radio" name="reason" id="r5" value="performance" />
+            <label for="r5">Too slow / hurt browser performance</label>
+          </div>
+          <div class="option">
+            <input type="radio" name="reason" id="r6" value="confusing" />
+            <label for="r6">Confusing to set up or use</label>
+          </div>
+          <div class="option">
+            <input type="radio" name="reason" id="r7" value="privacy_concerns" />
+            <label for="r7">Privacy or permissions concerns</label>
+          </div>
+          <div class="option">
+            <input type="radio" name="reason" id="r8" value="browser_only" />
+            <label for="r8">Just removing from this browser — my team still uses Notate</label>
+          </div>
+          <div class="option">
+            <input type="radio" name="reason" id="r9" value="accidental" />
+            <label for="r9">Accidental uninstall</label>
+          </div>
+          <div class="option">
+            <input type="radio" name="reason" id="r10" value="other" />
+            <label for="r10">Other</label>
+          </div>
+
+          <div class="reinstall-hint" id="reinstall-hint">
+            Changed your mind? <a id="reinstall-link" href="https://chromewebstore.google.com/detail/notate/ajfbllnonaikodlbobolfgblbbkgmbbh" target="_blank" rel="noopener">Reinstall Notate →</a>
+          </div>
+        </fieldset>
+
+        <label class="detail-label" for="detail">Anything else you'd like to share? <span style="color:#aaa">(optional)</span></label>
+        <textarea id="detail" name="detail" placeholder="Tell us more…" maxlength="2000"></textarea>
+
+        <div class="contact-row">
+          <input type="checkbox" id="contact_ok" name="contact_ok" />
+          <label for="contact_ok">OK if the Notate team follows up with me</label>
+        </div>
+
+        <div class="actions">
+          <button type="submit" id="submit-btn" disabled>Send feedback</button>
+          <a href="#" class="skip-link" id="skip-link">Skip</a>
+        </div>
+
+        <p class="error-msg" id="error-msg">Couldn't save your response. That's OK — feel free to close this page.</p>
+      </form>
+    </div>
+
+    <div class="success" id="success-section">
+      <h2>Thank you — your feedback helps.</h2>
+      <p>We'll use it to make Notate better.<br>If you change your mind, you're always welcome back.</p>
+      <a href="https://chromewebstore.google.com/detail/notate/ajfbllnonaikodlbobolfgblbbkgmbbh" target="_blank" rel="noopener">Reinstall Notate</a>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "https://gwqxaxtawjxcesamesyx.supabase.co"
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3cXhheHRhd2p4Y2VzYW1lc3l4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNjE0MjMsImV4cCI6MjA5NTYzNzQyM30.4BP_c8PVCDGYuB5pYHD_3ZAN7tukJzFNCOqUde0t048"
+
+    const params = new URLSearchParams(window.location.search)
+    const iid = params.get("iid") || "unknown"
+    const version = params.get("v") || "unknown"
+
+    const form = document.getElementById("feedback-form")
+    const submitBtn = document.getElementById("submit-btn")
+    const errorMsg = document.getElementById("error-msg")
+    const reinstallHint = document.getElementById("reinstall-hint")
+    const skipLink = document.getElementById("skip-link")
+
+    form.querySelectorAll('input[name="reason"]').forEach(radio => {
+      radio.addEventListener("change", () => {
+        submitBtn.disabled = false
+        reinstallHint.style.display = radio.value === "accidental" ? "block" : "none"
+      })
+    })
+
+    skipLink.addEventListener("click", e => {
+      e.preventDefault()
+      showSuccess()
+    })
+
+    form.addEventListener("submit", async e => {
+      e.preventDefault()
+      const reason = form.querySelector('input[name="reason"]:checked')?.value
+      if (!reason) return
+
+      submitBtn.disabled = true
+      submitBtn.textContent = "Sending…"
+      errorMsg.style.display = "none"
+
+      const payload = {
+        install_id: iid,
+        version,
+        reason,
+        detail: form.detail.value.trim() || null,
+        contact_ok: form.contact_ok.checked,
+      }
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/uninstall_feedback`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+            "Prefer": "return=minimal",
+          },
+          body: JSON.stringify(payload),
+        })
+
+        if (!res.ok) throw new Error(res.status)
+        showSuccess()
+      } catch {
+        submitBtn.disabled = false
+        submitBtn.textContent = "Send feedback"
+        errorMsg.style.display = "block"
+      }
+    })
+
+    function showSuccess() {
+      document.getElementById("form-section").style.display = "none"
+      const s = document.getElementById("success-section")
+      s.style.display = "block"
+    }
+  </script>
+</body>
+</html>
